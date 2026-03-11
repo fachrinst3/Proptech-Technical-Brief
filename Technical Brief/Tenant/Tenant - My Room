@@ -1,0 +1,103 @@
+# Technical Brief: My Room Management (Tenant View)
+
+## 1. Project Overview
+
+- **Project Name:** PropTech Management System (Sistem Kos-kosan)
+- **Module:** My Room (Tenant Dashboard)
+- **Objective:** Menyediakan antarmuka bagi tenant untuk mengelola unit yang sedang disewa, melakukan pencarian unit aktif, dan mengotomatisasi status check-in berdasarkan validasi pembayaran.
+- **Access Control:** Authenticated Tenant Only.
+
+## 2. Tech Stack Reference
+
+- **Framework:** Next.js (App Router)
+- **Database:** PostgreSQL
+- **ORM:** Drizzle ORM
+- **Task Scheduler:** Cron Job (Vercel Cron / Inngest) untuk Auto Check-in.
+
+## 3. Auto Check-in Logic
+
+Sistem akan menjalankan prosedur otomatisasi setiap hari pada pukul 00:01 dengan logika sebagai berikut:
+
+1. **Selection:** Mencari order dengan `status = 'Deposit and Payment Received'`.
+2. **Date Match:** Memastikan `checkInDate` pada order tersebut sama dengan atau lebih kecil dari `Current Date`.
+3. **Execution:** - Mengubah status order menjadi `Ongoing`.
+   - Mengubah status fisik kamar (tabel `rooms`) menjadi `Occupied`.
+   - Mengirimkan notifikasi "Selamat Datang" kepada Tenant melalui WhatsApp/Email.
+
+## 4. Functional Requirements (User Stories)
+
+| ID         | Function             | User Story                                                                     | Acceptance Criteria                                                                            |
+| :--------- | :------------------- | :----------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------- |
+| **MYR-01** | **Active Room List** | Sebagai Tenant, saya bisa melihat list data kamar yang saya sewa.              | Menampilkan daftar unit dengan status sewa aktif (`Ongoing`) atau yang akan segera masuk.      |
+| **MYR-02** | **Location Filter**  | Sebagai Tenant, saya bisa mencari data kamar sewa berdasarkan filter lokasi.   | Memfilter daftar kamar berdasarkan Kota/Wilayah tempat hunian berada.                          |
+| **MYR-03** | **Landmark Filter**  | Sebagai Tenant, saya bisa mencari data kamar sewa berdasarkan filter landmark. | Memfilter daftar kamar berdasarkan kedekatan dengan titik penting (Stasiun/Kampus).            |
+| **MYR-04** | **Property Filter**  | Sebagai Tenant, saya bisa mencari data kamar sewa berdasarkan nama hunian.     | Pencarian atau dropdown filter berdasarkan nama Gedung/Properti.                               |
+| **MYR-05** | **Auto Check-in**    | Sistem melakukan proses check-in otomatis pada tanggal input order.            | Perubahan status ke `Ongoing` terjadi otomatis jika pembayaran Lunas dan tanggal sudah sesuai. |
+
+---
+
+## 5. Implementation Detail (Query Logic)
+
+### A. Fetching Tenant Rooms
+
+Query ini menggabungkan relasi antara `orders`, `rooms`, dan `properties` untuk mendukung filter:
+
+```typescript
+const tenantRooms = await db
+  .select()
+  .from(orders)
+  .innerJoin(rooms, eq(orders.roomId, rooms.id))
+  .innerJoin(properties, eq(rooms.propertyId, properties.id))
+  .where(
+    and(
+      eq(orders.tenantId, currentTenantId),
+      inArray(orders.status, ["Ongoing", "Deposit and Payment Received"]),
+      // Apply filters for Location, Landmark, or Property Name here
+    ),
+  );
+```
+
+### B. Auto Check-in Task (Server Action/Cron)
+
+Pseudocode Cron Job :
+
+```typescript
+export async function handleAutoCheckIn() {
+  const today = new Date();
+
+  await db
+    .update(orders)
+    .set({ status: "Ongoing" })
+    .where(
+      and(
+        eq(orders.status, "Deposit and Payment Received"),
+        lte(orders.checkInDate, today),
+      ),
+    );
+
+  // Sync status kamar menjadi Occupied
+  // ... (Update status on rooms table)
+}
+```
+
+## 6. UI/UX Specifications
+
+- Room Card UI: Setiap kartu kamar menampilkan Nama Hunian, No. Kamar, Tanggal Mulai Sewa, dan Countdown/Status (misal: "Active" atau "Checking in Today").
+
+- Filter Bar: Terletak di bagian atas halaman dengan desain minimalis untuk memudahkan tenant yang menyewa banyak unit (misal: Corporate Tenant).
+
+- Empty State: Jika belum ada sewa aktif, tampilkan ilustrasi dan tombol "Cari Hunian" yang mengarah kembali ke Halaman Home.
+
+## 7. Security & Business Rules
+
+- Access Isolation: Tenant hanya bisa melihat data miliknya sendiri berdasarkan session.userId.
+
+- Payment Requirement: Proses auto check-in TIDAK AKAN berjalan jika status pembayaran masih Waiting for Payment atau Deposit Received (hanya sebagian).
+
+- Data Integrity: Status Ongoing tidak bisa diubah kembali secara manual oleh tenant untuk menghindari manipulasi durasi sewa.
+
+## 8. Data Integrity
+
+- Audit Logs: Setiap perubahan status otomatis harus dicatat dalam tabel activity_logs untuk membantu Admin melakukan audit jika terjadi perselisihan tanggal masuk.
+
+- Sync Status: Memastikan status rooms (Fisik) dan orders (Kontrak) selalu sinkron untuk mencegah kamar disewa kembali di halaman pengunjung saat tenant sudah check-in.
