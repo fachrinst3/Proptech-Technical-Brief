@@ -2,11 +2,10 @@
 
 ## 1. Project Overview
 
-**Project Name:** PropTech Management System (Sistem Kos-kosan)
-**Module:** Master Data Lokasi
-**Objective:** Mengelola data referensi lokasi (seperti Area, Cabang, atau Wilayah) yang akan digunakan sebagai pengelompokan pada saat input data Hunian/Kos-kosan.
-
-**Access Control:** Restricted to **Admin** role only.
+- **Project Name:** PropTech Management System (Sistem Kos-kosan)
+- **Module:** Master Data Lokasi
+- **Objective:** Mengelola data referensi lokasi (seperti Area, Cabang, atau Wilayah) yang akan digunakan sebagai pengelompokan pada saat input data Hunian/Kos-kosan.
+- **Access Control:** Restricted to **Admin** role only.
 
 ---
 
@@ -60,21 +59,21 @@ export const locations = pgTable("locations", {
 
 1. getLocations(search?: string):
 
-Mengambil semua lokasi. Jika ada parameter search, gunakan ilike(locations.name, %${search}%).
+- Mengambil semua lokasi. Jika ada parameter search, gunakan ilike(locations.name, %${search}%).
 
 2. createLocation(data):
 
-Validasi nama lokasi tidak boleh kosong.
+- Validasi nama lokasi tidak boleh kosong.
 
-Cek apakah nama lokasi sudah ada (Unique check) untuk menghindari duplikasi.
+- Cek apakah nama lokasi sudah ada (Unique check) untuk menghindari duplikasi.
 
 3. updateLocation(id, data):
 
-Melakukan update nama atau deskripsi lokasi berdasarkan ID.
+- Melakukan update nama atau deskripsi lokasi berdasarkan ID.
 
 4. deleteLocation(id):
 
-Penting: Tambahkan pengecekan apakah ID lokasi ini sedang digunakan di tabel properties. Jika ya, cegah penghapusan atau berikan peringatan (Restricted Delete).
+- Penting: Tambahkan pengecekan apakah ID lokasi ini sedang digunakan di tabel properties. Jika ya, cegah penghapusan atau berikan peringatan (Restricted Delete).
 
 ## 7. UI/UX Specifications
 
